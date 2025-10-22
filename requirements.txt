@@ -4,3 +4,4 @@ pandas
 openpyxl
 tqdm
 numpy
+scikit-learn
