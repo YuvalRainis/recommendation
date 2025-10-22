@@ -1,0 +1,6 @@
+streamlit
+xgboost
+pandas
+openpyxl
+tqdm
+numpy
