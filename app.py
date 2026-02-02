@@ -6,8 +6,8 @@ import itertools
 
 # === Recommendation Logic ===
 def recommend_best_parameters(patient_profile, model, batch_size=50000):
-    pulse_limits_max = {1: 150, 2: 300, 3: 300, 4: 350, 5: 350, 7: 400}
-    pulse_limits_min = {1: 50, 2: 40, 3: 60, 4: 100, 5: 200, 7: 200}
+    pulse_limits_max = {1: 150, 2: 300, 3: 300, 4: 350, 5: 350, 6: 350, 7: 400}
+    pulse_limits_min = {1: 50, 2: 40, 3: 60, 4: 100, 5: 200, 6: 150, 7: 200}
     treated_area = int(patient_profile['TreatedArea'])
     max_pulses = pulse_limits_max.get(treated_area, 1000)
     min_pulses = pulse_limits_min.get(treated_area, 1)
@@ -82,63 +82,52 @@ st.write("Enter the patient’s details to receive personalized treatment recomm
 
 age = st.number_input("Age", min_value=18, max_value=90, value=40)
 gender = st.selectbox("Gender", [("1", "Female"), ("2", "Male")], format_func=lambda x: x[1])
-race = st.selectbox(
-    "Race",
-    [("1", "Caucasian"), ("2", "Asian"), ("3", "Black"), ("4", "Other")],
-    format_func=lambda x: x[1]
-)
-ethnicity = st.selectbox(
-    "Ethnicity",
-    [("1", "Non-Hispanic"), ("2", "Hispanic")],
-    format_func=lambda x: x[1]
-)
+race = st.selectbox("Race", [("1", "Caucasian"), ("2", "Asian"), ("3", "Black"), ("4", "Other")], format_func=lambda x: x[1])
+ethnicity = st.selectbox("Ethnicity", [("1", "Non-Hispanic"), ("2", "Hispanic")], format_func=lambda x: x[1])
 treated_area = st.selectbox(
     "Treated Area",
-    [("1", "Forehead"), ("2", "Cheeks"), ("3", "Neck"), ("4", "Chest"), ("5", "Arms"), ("7", "Buttocks")],
+    [("1", "Forehead"), ("2", "Cheeks"), ("3", "Neck"), ("4", "Cheeks, Submental & Upper neck"), ("5", "Arms"), ("6", "Abdomen"), ("7", "Buttocks")],
     format_func=lambda x: x[1]
 )
 skin_type = st.number_input("Skin Type (1-6)", min_value=1, max_value=6, value=3)
 
-# === Validation rule for Hispanic ethnicity ===
-if ethnicity[0] == "2" and race[0] not in ["1", "4"]:
-    st.warning("⚠️ Hispanic patients can only be 'Caucasian' or 'Other'. Please adjust the Race selection.")
-else:
-    if st.button("Generate Recommendation"):
-        st.write("⏳ Loading model and generating recommendation...")
-        try:
-            model = xgb.XGBRegressor()
-            model.load_model("best_xgb_model.json")
+if st.button("Generate Recommendation"):
+    st.write("⏳ Loading model and generating recommendation...")
+    try:
+        model = xgb.XGBRegressor()
+        model.load_model("best_xgb_model.json")
 
-            profile = {
-                'Age': age,
-                'Gender': int(gender[0]),
-                'Race': int(race[0]),
-                'Ethnicity': int(ethnicity[0]),
-                'TreatedArea': int(treated_area[0]),
-                'Skin Type': skin_type
-            }
+        profile = {
+            'Age': age,
+            'Gender': int(gender[0]),
+            'Race': int(race[0]),
+            'Ethnicity': int(ethnicity[0]),
+            'TreatedArea': int(treated_area[0]),
+            'Skin Type': skin_type
+        }
 
-            result = recommend_best_parameters(profile, model)
-            if result is None:
-                st.error("No valid recommendation found.")
-            else:
-                st.success("✅ Recommended Treatment Parameters:")
+        result = recommend_best_parameters(profile, model)
+        if result is None:
+            st.error("No valid recommendation found.")
+        else:
+            st.success("✅ Recommended Treatment Parameters:")
 
-                # Styling for better readability
-                st.markdown("""
-                    <style>
-                    .dataframe th, .dataframe td {
-                        white-space: nowrap;
-                        text-align: center;
-                        padding: 8px 14px;
-                        font-size: 16px;
-                    }
-                    </style>
-                    """, unsafe_allow_html=True)
+            # Styling for better readability
+            st.markdown("""
+                <style>
+                .dataframe th, .dataframe td {
+                    white-space: nowrap;
+                    text-align: center;
+                    padding: 8px 14px;
+                    font-size: 16px;
+                }
+                </style>
+                """, unsafe_allow_html=True)
 
-                # Display table with full width and clean index
-                df_display = pd.DataFrame([result]).reset_index(drop=True)
-                st.dataframe(df_display, use_container_width=True)
+            # Display table with full width and clean index
+            df_display = pd.DataFrame([result]).reset_index(drop=True)
+            st.dataframe(df_display, use_container_width=True)
 
-        except Exception as e:
-            st.error(f"Error: {str(e)}")
+    except Exception as e:
+        st.error(f"Error: {str(e)}")
+
