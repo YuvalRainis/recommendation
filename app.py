@@ -6,8 +6,8 @@ import itertools
 
 # === Recommendation Logic ===
 def recommend_best_parameters(patient_profile, model, batch_size=50000):
-    pulse_limits_max = {1: 150, 2: 300, 3: 300, 4: 350, 5: 350, 6: 350, 7: 400}
-    pulse_limits_min = {1: 50, 2: 40, 3: 60, 4: 100, 5: 200, 6: 150, 7: 200}
+    pulse_limits_max = {1: 150, 2: 300, 3: 300, 4: 350, 5: 350, 7: 400}
+    pulse_limits_min = {1: 50, 2: 40, 3: 60, 4: 100, 5: 200, 7: 200}
     treated_area = int(patient_profile['TreatedArea'])
     max_pulses = pulse_limits_max.get(treated_area, 1000)
     min_pulses = pulse_limits_min.get(treated_area, 1)
@@ -86,7 +86,7 @@ race = st.selectbox("Race", [("1", "Caucasian"), ("2", "Asian"), ("3", "Black"),
 ethnicity = st.selectbox("Ethnicity", [("1", "Non-Hispanic"), ("2", "Hispanic")], format_func=lambda x: x[1])
 treated_area = st.selectbox(
     "Treated Area",
-    [("1", "Forehead"), ("2", "Cheeks"), ("3", "Neck"), ("4", "Cheeks, Submental & Upper neck"), ("5", "Arms"), ("6", "Abdomen"), ("7", "Buttocks")],
+    [("1", "Forehead"), ("2", "Cheeks"), ("3", "Neck"), ("4", "Cheeks, Submental & Upper neck"), ("5", "Arms"), ("7", "Buttocks")],
     format_func=lambda x: x[1]
 )
 skin_type = st.number_input("Skin Type (1-6)", min_value=1, max_value=6, value=3)
