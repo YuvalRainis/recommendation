@@ -95,7 +95,6 @@ treated_area = st.selectbox(
 skin_type = st.number_input("Skin Type (1-6)", min_value=1, max_value=6, value=3)
 
 # --- Severity input section ---
-st.markdown("### Severity (pre-treatment)")
 # Manual entry only: ES 1-9
 severity_value = st.number_input("Severity Pre treatment (ES, 1.0-9.0)", min_value=1.0, max_value=9.0, value=5.5, step=0.1)
 severity_normalized = None
