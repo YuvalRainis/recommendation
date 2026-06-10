@@ -159,6 +159,9 @@ if st.button("Generate Recommendation"):
 
             # Display table with full width and clean index
             df_display = pd.DataFrame([result]).reset_index(drop=True)
+            # Hide internal-only columns from the user (e.g., normalized severity)
+            if 'Severity_Normalized' in df_display.columns:
+                df_display = df_display.drop(columns=['Severity_Normalized'])
             st.dataframe(df_display, use_container_width=True)
 
     except Exception as e:
