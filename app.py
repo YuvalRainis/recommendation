@@ -3,44 +3,8 @@ import xgboost as xgb
 import pandas as pd
 import numpy as np
 import itertools
-import re
 import os
-
-# Helper: map numeric severity to rubric label
-def map_severity_label(value, rubric="3-level", scale_min=0.0, scale_max=10.0):
-    try:
-        v = float(value)
-    except Exception:
-        return str(value)
-
-    # protect divide by zero
-    try:
-        span = float(scale_max) - float(scale_min)
-        if span <= 0:
-            # fallback to 0-10
-            scale_min, scale_max, span = 0.0, 10.0, 10.0
-    except Exception:
-        scale_min, scale_max, span = 0.0, 10.0, 10.0
-
-    # normalize to 0..1
-    normalized = (v - float(scale_min)) / span
-    # clamp
-    normalized = max(0.0, min(1.0, normalized))
-
-    if rubric == "4-level":
-        if normalized <= 0.25:
-            return "Mild"
-        if normalized <= 0.50:
-            return "Moderate"
-        if normalized <= 0.75:
-            return "Severe"
-        return "Extreme"
-    else:
-        if normalized <= 1/3:
-            return "Mild"
-        if normalized <= 2/3:
-            return "Moderate"
-        return "Severe"
+import os
 
 # === Recommendation Logic ===
 def recommend_best_parameters(patient_profile, model, batch_size=50000):
@@ -132,106 +96,16 @@ skin_type = st.number_input("Skin Type (1-6)", min_value=1, max_value=6, value=3
 
 # --- Severity input section ---
 st.markdown("### Severity (pre-treatment)")
-severity_source = st.radio("Severity input method", ["Manual entry", "Upload Excel (worksheet with severity)"], index=0)
-
-severity_value = None
+# Manual entry only: ES 1-9
+severity_value = st.number_input("Severity Pre treatment (ES, 1.0-9.0)", min_value=1.0, max_value=9.0, value=5.5, step=0.1)
 severity_normalized = None
-severity_rubric = st.selectbox("Severity rubric", ["Mild / Moderate / Severe", "Mild / Moderate / Severe / Extreme"], format_func=lambda x: x)
-rubric_mode = "3-level" if severity_rubric.startswith("Mild / Moderate / Severe") and "Extreme" not in severity_rubric else "4-level"
-
-if severity_source == "Manual entry":
-    # Manual entry is always on the ES 1-9 scale
-    severity_value = st.number_input("Severity Pre treatment (ES, 1.0-9.0)", min_value=1.0, max_value=9.0, value=5.5, step=0.1)
+try:
     scale_min, scale_max = 1.0, 9.0
-    try:
-        denom = (scale_max - scale_min) if (scale_max - scale_min) != 0 else 1.0
-        severity_normalized = (float(severity_value) - scale_min) / denom
-        severity_normalized = max(0.0, min(1.0, severity_normalized))
-    except Exception:
-        severity_normalized = None
-
-    severity_category = map_severity_label(severity_value, rubric_mode, scale_min=scale_min, scale_max=scale_max)
-    st.write(f"Mapped severity: {severity_category} (normalized={severity_normalized})")
-else:
-    uploaded = st.file_uploader("Upload Excel file (xlsx)", type=["xlsx", "xls"]) 
-    if uploaded is not None:
-        try:
-            df_uploaded = pd.read_excel(uploaded, sheet_name=None)
-            # try to find the expected worksheet name first
-            sheet_name = None
-            for s in df_uploaded.keys():
-                if "DB Bruto body" in s or "Bruto" in s:
-                    sheet_name = s
-                    break
-            if sheet_name is None:
-                # fall back to first sheet
-                sheet_name = list(df_uploaded.keys())[0]
-
-            df_sheet = df_uploaded[sheet_name]
-            st.write(f"Loaded sheet: {sheet_name} — {df_sheet.shape[0]} rows")
-
-            # try to detect severity columns (value and scale)
-            candidates = [c for c in df_sheet.columns if "Severity" in str(c)]
-            if not candidates:
-                st.warning("No column with 'Severity' in the header was found. Please check your file.")
-            else:
-                # split value vs scale columns
-                value_cols = [c for c in candidates if 'scale' not in str(c).lower()]
-                scale_cols = [c for c in candidates if 'scale' in str(c).lower()]
-
-                value_col = value_cols[0] if value_cols else candidates[0]
-                if len(value_cols) > 1:
-                    value_col = st.selectbox("Detected severity value columns", value_cols)
-
-                scale_col = scale_cols[0] if scale_cols else None
-                if len(scale_cols) > 1:
-                    scale_col = st.selectbox("Detected severity scale columns", scale_cols)
-
-                # let user pick row
-                idx_options = df_sheet.index.tolist()
-                chosen_idx = st.selectbox("Choose row (patient) to read severity from", idx_options)
-
-                val = df_sheet.loc[chosen_idx, value_col]
-                st.write(f"Value from file ({value_col}): {val}")
-
-                # try to obtain scale text (prefer same row in scale_col, else first non-null)
-                scale_min, scale_max = 0.0, 10.0
-                if scale_col is not None:
-                    scale_text = df_sheet.loc[chosen_idx, scale_col]
-                    if pd.isna(scale_text):
-                        non_null = df_sheet[scale_col].dropna()
-                        if len(non_null) > 0:
-                            scale_text = str(non_null.iloc[0])
-                    if not pd.isna(scale_text):
-                        st.write(f"Detected scale text ({scale_col}): {scale_text}")
-                        # parse patterns like 'scale 1-9' or '1-9'
-                        m = re.search(r"(\d+)\s*[-–]\s*(\d+)", str(scale_text))
-                        if not m:
-                            m = re.search(r"scale\s*(\d+)\s*[-–]\s*(\d+)", str(scale_text), flags=re.IGNORECASE)
-                        if m:
-                            try:
-                                scale_min = float(m.group(1))
-                                scale_max = float(m.group(2))
-                            except Exception:
-                                scale_min, scale_max = 0.0, 10.0
-
-                try:
-                    severity_value = float(val)
-                except Exception:
-                    severity_value = val
-
-                # compute normalized severity based on parsed scale
-                try:
-                    denom = (scale_max - scale_min) if (scale_max - scale_min) != 0 else 1.0
-                    severity_normalized = (float(severity_value) - scale_min) / denom
-                    severity_normalized = max(0.0, min(1.0, severity_normalized))
-                except Exception:
-                    severity_normalized = None
-
-                severity_category = map_severity_label(severity_value, rubric_mode, scale_min=scale_min, scale_max=scale_max)
-                st.write(f"Mapped severity: {severity_category} (normalized={severity_normalized})")
-        except Exception as e:
-            st.error(f"Failed to read Excel: {e}")
+    denom = (scale_max - scale_min) if (scale_max - scale_min) != 0 else 1.0
+    severity_normalized = (float(severity_value) - scale_min) / denom
+    severity_normalized = max(0.0, min(1.0, severity_normalized))
+except Exception:
+    severity_normalized = None
 
 if st.button("Generate Recommendation"):
     st.write("⏳ Loading model and generating recommendation...")
