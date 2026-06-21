@@ -30,7 +30,7 @@ def recommend_best_parameters(patient_profile, model, batch_size=50000):
 
     cols = ['Age', 'Gender', 'Race', 'Ethnicity', 'TreatedArea',
             'Applicator', 'Number of pulses', 'Number of passes',
-            'Energy_J', 'Post_cooling_sec', 'Skin Type', 'Severity_Normalized']
+            'Energy_J', 'Post_cooling_sec', 'Skin Type', 'Severity_Normalized', 'Indication']
     best_row, best_score = None, -np.inf
 
     def combos_generator():
@@ -50,7 +50,8 @@ def recommend_best_parameters(patient_profile, model, batch_size=50000):
                     'Number of passes': num_passes,
                     'Energy_J': energy,
                     'Post_cooling_sec': cooling,
-                    'Severity_Normalized': patient_profile.get('Severity_Normalized', 0)
+                    'Severity_Normalized': patient_profile.get('Severity_Normalized', 0),
+                    'Indication': patient_profile.get('Indication', 'Unknown')
                 }
 
     batch = []
