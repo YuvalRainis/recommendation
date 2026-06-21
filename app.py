@@ -95,11 +95,45 @@ treated_area = st.selectbox(
 skin_type = st.number_input("Skin Type (1-6)", min_value=1, max_value=6, value=3)
 
 # --- Severity input section ---
-# Manual entry only: ES 1-9
-severity_value = st.number_input("Severity Pre treatment (ES, 1.0-9.0)", min_value=1.0, max_value=9.0, value=5.5, step=0.1)
+# --- Indication & Severity input section ---
+# Allow per-indication scales and normalization. Steps reflect real-world integer scales,
+# but decimal averages are accepted and normalized.
+indication = st.selectbox(
+    "Indication",
+    [
+        "Wrinkles (1-9)",
+        "Acne scars (0-4)",
+        "Upper arm laxity (0-4)",
+        "Cellulite (0-5)",
+        "Other (0-10)"
+    ],
+)
+
+# Map indication -> (min, max, step)
+indication_scales = {
+    "Wrinkles (1-9)": (1.0, 9.0, 1.0),
+    "Acne scars (0-4)": (0.0, 4.0, 1.0),
+    "Upper arm laxity (0-4)": (0.0, 4.0, 1.0),
+    "Cellulite (0-5)": (0.0, 5.0, 1.0),
+    "Other (0-10)": (0.0, 10.0, 0.1)
+}
+
+scale_min, scale_max, scale_step = indication_scales.get(indication, (0.0, 9.0, 0.1))
+
+# Default severity value: midpoint
+default_sev = float((scale_min + scale_max) / 2.0)
+
+# Use a number_input with appropriate step and bounds
+severity_value = st.number_input(
+    f"Severity Pre treatment ({indication})",
+    min_value=float(scale_min),
+    max_value=float(scale_max),
+    value=default_sev,
+    step=float(scale_step)
+)
+
 severity_normalized = None
 try:
-    scale_min, scale_max = 1.0, 9.0
     denom = (scale_max - scale_min) if (scale_max - scale_min) != 0 else 1.0
     severity_normalized = (float(severity_value) - scale_min) / denom
     severity_normalized = max(0.0, min(1.0, severity_normalized))
@@ -139,6 +173,9 @@ if st.button("Generate Recommendation"):
         if severity_normalized is not None:
             profile['Severity_Normalized'] = float(severity_normalized)
 
+        # include indication string for downstream logic (optional)
+        profile['Indication'] = indication
+
         result = recommend_best_parameters(profile, model)
         if result is None:
             st.error("No valid recommendation found.")
@@ -158,8 +195,28 @@ if st.button("Generate Recommendation"):
                 """, unsafe_allow_html=True)
 
             # Display table with full width and clean index
-            df_display = pd.DataFrame([result]).reset_index(drop=True)
-            # Hide internal-only columns from the user (e.g., normalized severity)
+            # result is a Series; add human-friendly applicator name and energy calculations
+            res = result.copy()
+            applicator_map = {1: ("Precise", 3), 2: ("Lift", 7), 3: ("LiftHD", 7)}
+            app_id = int(res.get('Applicator', 0))
+            app_name, pzt_count = applicator_map.get(app_id, (f"Applicator {app_id}", 1))
+            res['Applicator_name'] = app_name
+
+            # compute recommended total energy and number of squares (rounded)
+            try:
+                pulses = float(res.get('Number of pulses', 0))
+                energy_j = float(res.get('Energy_J', 0))
+                recommended_total_energy = pulses * energy_j * float(pzt_count)
+                recommended_num_squares = int(round(recommended_total_energy / 750.0))
+            except Exception:
+                recommended_total_energy = np.nan
+                recommended_num_squares = np.nan
+
+            res['Recommended_total_energy_J'] = recommended_total_energy
+            res['Recommended_num_squares'] = recommended_num_squares
+
+            df_display = pd.DataFrame([res]).reset_index(drop=True)
+            # Hide raw normalized severity if you prefer internal-only
             if 'Severity_Normalized' in df_display.columns:
                 df_display = df_display.drop(columns=['Severity_Normalized'])
             st.dataframe(df_display, use_container_width=True)
