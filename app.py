@@ -59,6 +59,9 @@ def recommend_best_parameters(patient_profile, model, batch_size=50000):
         batch.append(row)
         if len(batch) >= batch_size:
             df_b = pd.DataFrame(batch, columns=cols)
+            # ensure Indication is categorical to match training dtype
+            if 'Indication' in df_b.columns:
+                df_b['Indication'] = df_b['Indication'].astype('category')
             preds = model.predict(df_b[cols])
             idx = int(np.argmax(preds))
             if preds[idx] > best_score:
@@ -69,6 +72,9 @@ def recommend_best_parameters(patient_profile, model, batch_size=50000):
 
     if batch:
         df_b = pd.DataFrame(batch, columns=cols)
+        # ensure Indication is categorical to match training dtype
+        if 'Indication' in df_b.columns:
+            df_b['Indication'] = df_b['Indication'].astype('category')
         preds = model.predict(df_b[cols])
         idx = int(np.argmax(preds))
         if preds[idx] > best_score:
