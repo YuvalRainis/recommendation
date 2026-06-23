@@ -23,6 +23,13 @@ def recommend_best_parameters(patient_profile, model, batch_size=50000):
         [3]
     )
 
+    # Exclude Precise (1) for upper-arm or cellulite indications
+    indication_text = str(patient_profile.get('Indication', '')).lower()
+    if any(k in indication_text for k in ['upper arm', 'upperarm', 'cellulit', 'cellulite']):
+        valid_applicators = [a for a in valid_applicators if a != 1]
+        if not valid_applicators:
+            valid_applicators = [3]
+
     energies = np.round(np.arange(3.0, 5.1, 0.2), 1)
     coolings = [1, 2, 3]
     passes_options = [2, 3, 4]
@@ -122,7 +129,7 @@ indication_scales = {
     "Acne scars (0-4)": (0.0, 4.0, 1.0),
     "Upper arm laxity (0-4)": (0.0, 4.0, 1.0),
     "Cellulite (0-5)": (0.0, 5.0, 1.0),
-    "Other (0-10)": (0.0, 10.0, 0.1)
+    "Other (0-10)": (0.0, 10.0, 1.0)
 }
 
 scale_min, scale_max, scale_step = indication_scales.get(indication, (0.0, 9.0, 0.1))
@@ -141,8 +148,11 @@ severity_value = st.number_input(
 
 severity_normalized = None
 try:
+    # Round severity to nearest integer step for these indications (user requested integer steps)
+    severity_value = float(severity_value)
+    severity_value = float(int(round(severity_value)))
     denom = (scale_max - scale_min) if (scale_max - scale_min) != 0 else 1.0
-    severity_normalized = (float(severity_value) - scale_min) / denom
+    severity_normalized = (severity_value - scale_min) / denom
     severity_normalized = max(0.0, min(1.0, severity_normalized))
 except Exception:
     severity_normalized = None
