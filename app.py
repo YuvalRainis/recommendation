@@ -138,13 +138,29 @@ scale_min, scale_max, scale_step = indication_scales.get(indication, (0.0, 9.0, 
 default_sev = float((scale_min + scale_max) / 2.0)
 
 # Use a number_input with appropriate step and bounds
-severity_value = st.number_input(
-    f"Severity Pre treatment ({indication})",
-    min_value=float(scale_min),
-    max_value=float(scale_max),
-    value=default_sev,
-    step=float(scale_step)
-)
+if float(scale_step) == 1.0:
+    # show integer input (no decimal places) for integer-step scales
+    severity_value = st.number_input(
+        f"Severity Pre treatment ({indication})",
+        min_value=int(scale_min),
+        max_value=int(scale_max),
+        value=int(default_sev),
+        step=1,
+        format="%d"
+    )
+    # ensure integer type
+    try:
+        severity_value = int(severity_value)
+    except Exception:
+        severity_value = int(round(float(severity_value)))
+else:
+    severity_value = st.number_input(
+        f"Severity Pre treatment ({indication})",
+        min_value=float(scale_min),
+        max_value=float(scale_max),
+        value=default_sev,
+        step=float(scale_step)
+    )
 
 severity_normalized = None
 try:
